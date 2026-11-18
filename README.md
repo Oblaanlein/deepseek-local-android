@@ -6,6 +6,12 @@
 
 > 非官方项目，与深度求索无关。
 
+## 下载
+
+**[⬇ 最新 APK](https://github.com/Oblaanlein/deepseek-local-android/releases/latest)** —— 要求 Android 8.0（API 26）及以上，安装后到「抽屉 → 设置」填自己的 API Key。
+
+> 若之前装过自己编译的 debug 包，需先卸载再装（签名不同，无法覆盖安装）。
+
 <p align="center">
   <img src="docs/screenshots/01-home.png" width="24%" />
   <img src="docs/screenshots/02-turns.png" width="24%" />
