@@ -10,7 +10,6 @@
 
 **[⬇ 最新 APK](https://github.com/Oblaanlein/deepseek-local-android/releases/latest)** —— 要求 Android 8.0（API 26）及以上，安装后到「抽屉 → 设置」填自己的 API Key。
 
-> 若之前装过自己编译的 debug 包，需先卸载再装（签名不同，无法覆盖安装）。
 
 <p align="center">
   <img src="docs/screenshots/01-home.png" width="24%" />
@@ -152,6 +151,9 @@ app/src/main/java/com/local/dsapp/
 ---
 
 ## 免责声明
+
+**这是一个 AI 辅助开发的项目。** 界面还原、协议对接、代码实现与调试主要由 AI 完成，人工只负责提出需求与验证结果。
+因此代码中可能存在未被发现的问题（包括但不限于数据丢失、请求异常、费用误算），请自行评估风险后使用。
 
 非官方项目，与深度求索（DeepSeek）无关，界面与协议的还原仅用于学习交流。
 使用需自备 API Key，费用由你的账号承担。

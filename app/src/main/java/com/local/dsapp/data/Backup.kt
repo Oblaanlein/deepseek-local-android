@@ -2,11 +2,13 @@ package com.local.dsapp.data
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.io.InputStreamReader
 import java.time.Instant
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
+import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
 /**
@@ -18,8 +20,9 @@ import java.util.zip.ZipOutputStream
  *   ├─ chat_session_index.json        [{id,title,pinned,message_count,inserted_at,updated_at}]
  *   └─ chat_sessions/<id>_files/…    图片（本地版没有附件，暂不产出）
  *
- * 这样导出的包能直接给官方网页版导入，官方的包也能导进来。
- * 另外兼容本项目早期的纯 JSON 备份（没有 PK 头时按 JSON 解析）。
+ * 导入**必须流式**：官方备份动辄几十 MB，单个会话可达 10MB+、几千条消息，
+ * 把整个 zip 读进 ByteArray 再逐个解析会在手机上 OOM。
+ * 这里直接用 ZipInputStream 逐条读，每条解析完就丢，峰值只有一个会话那么大。
  */
 object Backup {
 
@@ -28,6 +31,13 @@ object Backup {
     private const val INDEX = "chat_session_index.json"
 
     private fun sessionPath(id: String) = "chat_sessions/$id.json"
+
+    /** 导入结果：成功的会话 + 失败条数与第一条错误（不再静默跳过） */
+    data class Result(
+        val sessions: List<Session>,
+        val failed: Int,
+        val firstError: String?
+    )
 
     /* ------------------------------------------------------------ 导出 */
 
@@ -134,31 +144,89 @@ object Backup {
 
     /* ------------------------------------------------------------ 导入 */
 
-    fun importBytes(bytes: ByteArray): List<Session> {
-        val isZip = bytes.size >= 2 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
-        return if (isZip) importZip(bytes) else importLegacyJson(String(bytes, Charsets.UTF_8))
-    }
+    /**
+     * 导入 zip。**必须用 ZipFile（读中央目录）而不是 ZipInputStream**：
+     * 官方导出器写的是流式 zip，条目用「数据描述符」+ STORED（不压缩），
+     * Java 的 ZipInputStream 遇到这种组合会直接抛
+     * `ZipException: only DEFLATED entries can have EXT descriptor`，
+     * 一个条目都读不到（表现为「压缩包里没有找到会话」）。
+     * ZipFile 走中央目录，对这种格式没问题。
+     */
+    fun importZipFile(file: File, onProgress: (Int, Int) -> Unit = { _, _ -> }): Result {
+        val sessions = ArrayList<Session>()
+        var failed = 0
+        var firstError: String? = null
 
-    private fun importZip(bytes: ByteArray): List<Session> {
-        val sessions = mutableListOf<Session>()
-        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                val name = entry.name
-                if (name.startsWith("chat_sessions/") && name.endsWith(".json") &&
-                    !name.removePrefix("chat_sessions/").contains('/')
-                ) {
-                    val text = zip.readBytes().toString(Charsets.UTF_8)
-                    runCatching { sessionFromArchive(JSONObject(text)) }.getOrNull()?.let { sessions.add(it) }
+        ZipFile(file).use { zip ->
+            val names = java.util.Collections.list(zip.entries()).map { it.name }
+
+            // 优先 chat_sessions/*.json；找不到就退一步，把所有非清单类 json 都试一遍
+            var candidates = names.filter { isSessionEntry(it) }
+            if (candidates.isEmpty()) {
+                candidates = names.filter {
+                    it.endsWith(".json") &&
+                        !it.endsWith("manifest.json") &&
+                        !it.endsWith("chat_session_index.json")
                 }
-                zip.closeEntry()
+            }
+            if (candidates.isEmpty()) {
+                throw IllegalStateException(
+                    "压缩包里没有会话文件（共 " + names.size + " 个条目：" +
+                        names.take(3).joinToString() + "…）"
+                )
+            }
+
+            onProgress(0, candidates.size)
+
+            candidates.forEachIndexed { index, name ->
+                try {
+                    val text = zip.getInputStream(zip.getEntry(name)).use { readText(it) }
+                    val s = sessionFromArchive(JSONObject(text))
+                    if (s != null) {
+                        sessions.add(s)
+                    } else {
+                        failed++
+                        if (firstError == null) {
+                            firstError = "会话为空：" + name.substringAfterLast('/')
+                        }
+                    }
+                } catch (t: Throwable) {
+                    failed++
+                    if (firstError == null) {
+                        firstError = name.substringAfterLast('/') + " → " +
+                            t.javaClass.simpleName + (t.message?.let { "：" + it } ?: "")
+                    }
+                }
+                onProgress(index + 1, candidates.size)
             }
         }
-        if (sessions.isEmpty()) throw IllegalArgumentException("压缩包里没有找到会话（chat_sessions/*.json）")
-        return sessions
+
+        if (sessions.isEmpty()) {
+            throw IllegalStateException(firstError ?: "压缩包里没有解析出任何会话")
+        }
+        return Result(sessions, failed, firstError)
     }
 
-    private fun importLegacyJson(text: String): List<Session> {
+    private fun isSessionEntry(name: String): Boolean =
+        name.startsWith("chat_sessions/") &&
+            name.endsWith(".json") &&
+            !name.removePrefix("chat_sessions/").contains('/')
+
+    /** 逐字符读，避免「字节数组 + String」双份内存 */
+    private fun readText(input: InputStream): String {
+        val sb = StringBuilder(1 shl 20)
+        val reader = InputStreamReader(input, Charsets.UTF_8)
+        val buf = CharArray(16 * 1024)
+        while (true) {
+            val n = reader.read(buf)
+            if (n <= 0) break
+            sb.append(buf, 0, n)
+        }
+        return sb.toString()
+    }
+
+    /** 兼容早期纯 JSON 备份（没有 PK 头） */
+    fun importLegacyJson(text: String): List<Session> {
         val root = JSONObject(text)
         val arr = root.optJSONArray("sessions")
             ?: throw IllegalArgumentException("文件既不是 ZIP 备份，也不是本应用导出的 JSON")
@@ -166,6 +234,9 @@ object Backup {
             arr.optJSONObject(i)?.let { sessionFromJson(it) }
         }
     }
+
+    fun isZip(head: ByteArray): Boolean =
+        head.size >= 2 && head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()
 
     private fun sessionFromArchive(o: JSONObject): Session? {
         val sid = o.optString("id").ifBlank { return null }
@@ -193,7 +264,7 @@ object Backup {
         val nextOf = HashMap<Int, Int>()
         for (i in 0 until path.size - 1) nextOf[path[i]] = path[i + 1]
 
-        val msgs = mutableListOf<Msg>()
+        val msgs = ArrayList<Msg>(arr.length())
         for (i in 0 until arr.length()) {
             val m = arr.optJSONObject(i) ?: continue
             val num = m.optInt("id")

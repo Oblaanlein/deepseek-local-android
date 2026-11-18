@@ -53,7 +53,12 @@ data class UiState(
     /** 附件面板是否展开 */
     val attachOpen: Boolean = false,
     /** 待发送的附件 */
-    val pending: List<Attachment> = emptyList()
+    val pending: List<Attachment> = emptyList(),
+    /** 正在导入聊天记录（弹进度框） */
+    val importing: Boolean = false,
+    /** 已解析 / 总数 */
+    val importDone: Int = 0,
+    val importTotal: Int = 0
 ) {
     val inChat: Boolean get() = active != null
     val chain: List<Msg> get() = active?.visibleChain().orEmpty()
@@ -214,12 +219,53 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     /** 导出成官方格式的 zip（网页版可直接导入） */
     fun exportZip(): ByteArray = com.local.dsapp.data.Backup.exportZip(store.sessions())
 
-    /** 导入：支持官方 zip 备份，也兼容早期的纯 JSON；返回导入条数 */
-    fun importBackup(bytes: ByteArray): Int {
-        val list = com.local.dsapp.data.Backup.importBytes(bytes)
-        list.forEach { store.save(it) }
-        _state.update { it.copy(sessions = store.sessions()) }
-        return list.size
+    /**
+     * 导入：支持官方 zip 备份，也兼容早期的纯 JSON。
+     * 全程在 IO 线程 + 流式读取（官方备份可达几十 MB，单会话几千条消息），结果用 toast 回报。
+     */
+    fun importBackup(uri: Uri) {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            _state.update { it.copy(importing = true, importDone = 0, importTotal = 0) }
+            val msg = withContext(Dispatchers.IO) {
+                runCatching {
+                    // ZipFile 需要文件路径，先把 SAF 的流落到缓存目录（官方备份是 STORED 未压缩，拷贝很快）
+                    val tmp = File(ctx.cacheDir, "import-" + System.currentTimeMillis() + ".bin")
+                    try {
+                        ctx.contentResolver.openInputStream(uri)?.use { raw ->
+                            tmp.outputStream().use { out -> raw.copyTo(out, 128 * 1024) }
+                        } ?: throw IllegalStateException("打不开这个文件")
+
+                        val head = ByteArray(2)
+                        tmp.inputStream().use { it.read(head) }
+
+                        val result = if (com.local.dsapp.data.Backup.isZip(head)) {
+                            com.local.dsapp.data.Backup.importZipFile(tmp) { done, total ->
+                                _state.update { it.copy(importDone = done, importTotal = total) }
+                            }
+                        } else {
+                            com.local.dsapp.data.Backup.Result(
+                                com.local.dsapp.data.Backup.importLegacyJson(
+                                    tmp.readText(Charsets.UTF_8)
+                                ), 0, null
+                            )
+                        }
+
+                        result.sessions.forEach { store.save(it) }
+                        _state.update { it.copy(sessions = store.sessions()) }
+
+                        if (result.failed > 0) {
+                            "已导入 ${result.sessions.size} 个对话，${result.failed} 个失败：${result.firstError}"
+                        } else {
+                            "已导入 ${result.sessions.size} 个对话"
+                        }
+                    } finally {
+                        tmp.delete()
+                    }
+                }.getOrElse { "导入失败：${it.message ?: it.javaClass.simpleName}" }
+            }
+            _state.update { it.copy(importing = false, toast = msg) }
+        }
     }
 
     /* ------------------------------------------------------------- 附件 */

@@ -51,7 +51,7 @@ fun SettingsScreen(
     onShowUsage: (Boolean) -> Unit,
     onVoice: (String) -> Unit,
     onExport: () -> ByteArray,
-    onImport: (ByteArray) -> Int,
+    onImport: (android.net.Uri) -> Unit,
     onToast: (String) -> Unit
 ) {
     val c = LocalDsColors.current
@@ -80,16 +80,8 @@ fun SettingsScreen(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val bytes = runCatching {
-                ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }.getOrNull()
-            if (bytes == null || bytes.isEmpty()) {
-                onToast("读取文件失败")
-            } else {
-                runCatching { onImport(bytes) }
-                    .onSuccess { onToast("已导入 $it 个对话") }
-                    .onFailure { onToast("导入失败：${it.message}") }
-            }
+            // 真正解析在 ViewModel 的 IO 线程里做（官方备份可能几十 MB），结果由它 toast 回来
+            onImport(uri)
         }
     }
 
