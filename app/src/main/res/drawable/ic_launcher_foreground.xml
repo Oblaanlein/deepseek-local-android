@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  图标前景：白色鲸鱼 + 两粒气泡。
+  整体再缩放 0.86 并居中，保证落在自适应图标的安全区（中心直径 66dp 的圆）内，
+  这样被圆形、方形、squircle 各种遮罩裁切时都不会切到尾巴或气泡。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+
+        <!-- 喷出的气泡 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.5"
+            android:pathData="M45,30 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.8"
+            android:pathData="M54,24 m-4.2,0 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0" />
+
+        <!-- 尾巴：两片圆润的尾鳍，从身体右端张开 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M68,51 C74,41.5 82,37.5 89,39.5 C87,47.5 79,52.5 71,55 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M68,57 C74,66.5 82,70.5 89,68.5 C87,60.5 79,55.5 71,53 Z" />
+
+        <!-- 身体：水滴形，头在左、尾根在右 -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,54 C30,43.6 40,36 51.5,36 C61.5,36 69,40.6 71.5,47.4 C72.4,50 72.4,52.4 71.5,55 C69,61.8 61.5,66.4 51.5,66.4 C40,66.4 30,64.4 30,54 Z" />
+
+        <!-- 眼睛（挖成底色蓝） -->
+        <path
+            android:fillColor="#3A55E0"
+            android:pathData="M43,48.5 m-2.7,0 a2.7,2.7 0 1,0 5.4,0 a2.7,2.7 0 1,0 -5.4,0" />
+    </group>
+</vector>

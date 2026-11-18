@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 占位图标：DeepSeek 蓝的鲸鱼剪影，二期再按官方 logo 精修 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#4D6BFE"
+        android:pathData="M84,24 C84,24 76,30 72,34 C64,29 54,28 46,31 C34,35 27,44 27,55 C27,66 35,74 47,74 C60,74 69,66 71,55 C74,56 78,56 81,53 L88,44 L84,24 Z" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,47 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" />
+</vector>

@@ -1,0 +1,349 @@
+package com.local.dsapp.ui
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.local.dsapp.R
+import com.local.dsapp.data.Msg
+
+@Composable
+fun ChatScreen(
+    state: UiState,
+    onMenu: () -> Unit,
+    onNewChat: () -> Unit,
+    onInput: (String) -> Unit,
+    onSend: () -> Unit,
+    onStop: () -> Unit,
+    onToggleThinking: () -> Unit,
+    onToggleSearch: () -> Unit,
+    onRegenerate: (String) -> Unit,
+    onEdit: (String) -> Unit,
+    onCancelEdit: () -> Unit,
+    onSwitchBranch: (String, Int) -> Unit,
+    onToast: (String) -> Unit,
+    onOpenUrl: (String) -> Unit,
+    onDeleteRound: (String) -> Unit,
+    onToggleAttach: () -> Unit,
+    onRemoveAttachment: (String) -> Unit,
+    onAddUri: (android.net.Uri, String?, String?, Boolean) -> Unit
+) {
+    val c = LocalDsColors.current
+    val chain = state.chain
+    val listState = rememberLazyListState()
+
+    var turnsOpen by remember { mutableStateOf(false) }
+    var jumpTarget by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(jumpTarget) {
+        jumpTarget?.let { idx ->
+            if (idx in chain.indices) listState.animateScrollToItem(idx)
+            jumpTarget = null
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+        ) {
+            TopBar(
+                title = state.active?.title.orEmpty(),
+                onMenu = onMenu,
+                onTurns = { turnsOpen = true },
+                onNewChat = onNewChat
+            )
+
+            Box(
+                Modifier
+                    .weight(1f)
+                    // 右滑唤出左边栏（历史），左滑唤出右边栏（轮次）
+                    .pointerInput(Unit) {
+                        var acc = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onHorizontalDrag = { _, dragAmount -> acc += dragAmount },
+                            onDragEnd = {
+                                when {
+                                    acc > 240f -> onMenu()
+                                    acc < -240f -> turnsOpen = true
+                                }
+                            }
+                        )
+                    }
+            ) {
+                if (chain.isEmpty()) {
+                    HomeBody()
+                } else {
+                    MessageList(
+                        state, chain, listState,
+                        onRegenerate, onEdit, onSwitchBranch, onToast, onOpenUrl
+                    )
+                }
+            }
+
+            if (state.editingId != null) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(c.surfaceAlt)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "正在修改这条消息，发送后会作为新分支",
+                        style = DsType.label.copy(color = c.textSecondary, fontSize = 12.5.sp),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "取消",
+                        style = DsType.label.copy(color = c.accent, fontSize = 12.5.sp),
+                        modifier = Modifier
+                            .clickable(onClick = onCancelEdit)
+                            .padding(4.dp)
+                    )
+                }
+            }
+
+            InputCard(
+                input = state.input,
+                streaming = state.streaming,
+                thinking = state.thinking,
+                search = state.search,
+                attachOpen = state.attachOpen,
+                pending = state.pending,
+                onInput = onInput,
+                onSend = onSend,
+                onStop = onStop,
+                onToggleThinking = onToggleThinking,
+                onToggleSearch = onToggleSearch,
+                onToggleAttach = onToggleAttach,
+                onRemoveAttachment = onRemoveAttachment,
+                onAddUri = onAddUri,
+                onToast = onToast
+            )
+        }
+
+        TurnsPanel(
+            visible = turnsOpen,
+            chain = chain,
+            session = state.active,
+            onClose = { turnsOpen = false },
+            onJump = { idx ->
+                jumpTarget = idx
+                turnsOpen = false
+            },
+            onEdit = { id ->
+                turnsOpen = false
+                onEdit(id)
+            },
+            onRegenerate = { id ->
+                turnsOpen = false
+                onRegenerate(id)
+            },
+            onDeleteRound = onDeleteRound
+        )
+    }
+}
+
+@Composable
+private fun TopBar(
+    title: String,
+    onMenu: () -> Unit,
+    onTurns: () -> Unit,
+    onNewChat: () -> Unit
+) {
+    val c = LocalDsColors.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+    ) {
+        Row(
+            Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onMenu
+                    )
+                    .padding(horizontal = 8.dp, vertical = 10.dp)
+            ) {
+                DsIcon(IconKind.Menu, size = 22.dp, tint = c.text, stroke = 1.9f)
+            }
+            // 轮次栏入口：菜单右边这个「目录」图标
+            Box(
+                Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onTurns
+                    )
+                    .padding(horizontal = 8.dp, vertical = 10.dp)
+            ) {
+                DsIcon(IconKind.Turns, size = 21.dp, tint = c.text, stroke = 1.8f)
+            }
+        }
+
+        if (title.isNotBlank()) {
+            Text(
+                title,
+                style = DsType.title.copy(color = c.text, fontSize = 16.5.sp),
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 64.dp)
+            )
+        }
+
+        Row(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .clickable { }
+                    .padding(8.dp)
+            ) {
+                DsIcon(IconKind.SpeakerOff, size = 21.dp, tint = c.text, stroke = 1.6f)
+            }
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onNewChat)
+                    .padding(8.dp)
+            ) {
+                DsIcon(IconKind.PlusCircle, size = 22.dp, tint = c.text, stroke = 1.6f)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeBody() {
+    val c = LocalDsColors.current
+    Column(
+        Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.weight(1f))
+        Image(
+            painterResource(R.drawable.whale),
+            contentDescription = null,
+            modifier = Modifier.size(62.dp)
+        )
+        Spacer(Modifier.height(22.dp))
+        Text(
+            "嗨！今天想聊些什么？",
+            style = DsType.body.copy(
+                color = c.text,
+                fontSize = 21.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+        Spacer(Modifier.weight(1.6f))
+    }
+}
+
+@Composable
+private fun MessageList(
+    state: UiState,
+    chain: List<Msg>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onRegenerate: (String) -> Unit,
+    onEdit: (String) -> Unit,
+    onSwitchBranch: (String, Int) -> Unit,
+    onToast: (String) -> Unit,
+    onOpenUrl: (String) -> Unit
+) {
+    val lastLen = chain.lastOrNull()?.let { it.plainText.length + it.thinkingText.length } ?: 0
+
+    LaunchedEffect(chain.size, lastLen) {
+        if (chain.isNotEmpty()) {
+            listState.scrollToItem(chain.lastIndex)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 10.dp)
+    ) {
+        items(chain, key = { it.id }) { msg ->
+            MessageItem(
+                msg = msg,
+                siblings = state.active?.siblings(msg.id) ?: listOf(msg),
+                autoCollapseThinking = state.autoCollapse,
+                showUsage = state.showUsage,
+                streaming = state.streaming,
+                onRegenerate = { onRegenerate(msg.id) },
+                onEdit = { onEdit(msg.id) },
+                onSwitchBranch = { delta -> onSwitchBranch(msg.id, delta) },
+                onToast = onToast,
+                onOpenUrl = onOpenUrl,
+                apiKey = state.apiKey,
+                voice = state.voice
+            )
+        }
+    }
+}
