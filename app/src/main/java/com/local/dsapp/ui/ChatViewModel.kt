@@ -133,10 +133,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun renameSession(id: String, title: String) {
         val s = store.load(id) ?: return
         val next = s.copy(title = title, updatedAt = System.currentTimeMillis())
-        store.save(next)
+        persist(next)
         _state.update { st ->
             st.copy(
-                sessions = store.sessions(),
+                sessions = withSession(st.sessions, next),
                 active = if (st.active?.id == id) next else st.active
             )
         }
@@ -144,8 +144,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun togglePin(id: String) {
         val s = store.load(id) ?: return
-        store.save(s.copy(pinned = !s.pinned))
-        _state.update { it.copy(sessions = store.sessions()) }
+        val next = s.copy(pinned = !s.pinned)
+        persist(next)
+        _state.update { it.copy(sessions = withSession(it.sessions, next)) }
     }
 
     /* ------------------------------------------------------------- 多选 */
@@ -166,7 +167,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         ids.forEach { store.delete(it) }
         _state.update { st ->
             st.copy(
-                sessions = store.sessions(),
+                sessions = st.sessions.filterNot { it.id in ids },
                 active = if (st.active?.id in ids) null else st.active,
                 selecting = false,
                 selectedIds = emptySet()
@@ -176,10 +177,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun pinSelected() {
         val ids = _state.value.selectedIds
-        ids.forEach { id ->
-            store.load(id)?.let { store.save(it.copy(pinned = true)) }
+        val pinned = _state.value.sessions.filter { it.id in ids }.map { it.copy(pinned = true) }
+        pinned.forEach { persist(it) }
+        _state.update { st ->
+            val map = pinned.associateBy { it.id }
+            st.copy(
+                sessions = st.sessions.map { map[it.id] ?: it },
+                selecting = false,
+                selectedIds = emptySet()
+            )
         }
-        _state.update { it.copy(sessions = store.sessions(), selecting = false, selectedIds = emptySet()) }
     }
 
     /* ------------------------------------------------------------- 设置 */
@@ -360,6 +367,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelEdit() = _state.update { it.copy(editingId = null, input = "") }
 
     /** 翻页：在同父节点的兄弟之间切换 */
+    /** 在内存里替换一条会话，避免每次操作都从 SharedPreferences 全量重读 + 解析（大会话要几百毫秒） */
+    private fun withSession(list: List<Session>, s: Session): List<Session> =
+        (list.filterNot { it.id == s.id } + s).sortedByDescending { it.updatedAt }
+
+    /** 落盘放后台线程：大会话 toJson 很慢，不能占主线程 */
+    private fun persist(s: Session) {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { store.save(s) } }
+    }
+
     fun switchBranch(msgId: String, delta: Int) {
         val st = _state.value
         val s = st.active ?: return
@@ -368,8 +384,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val idx = sibs.indexOfFirst { it.id == msgId }
         val target = sibs.getOrNull(idx + delta) ?: return
         val next = s.selectChild(target.parentId, target.id)
-        store.save(next)
-        _state.update { it.copy(active = next, sessions = store.sessions()) }
+        // 关键：这里原来同步 store.save + store.sessions()，等于每次点击都把全部会话重新解析一遍
+        persist(next)
+        _state.update { it.copy(active = next, sessions = withSession(it.sessions, next)) }
     }
 
     /** 重新生成：为该问题的回答新增一个兄弟节点 */
@@ -414,8 +431,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (next.rootMessageId in doomed) next = next.copy(rootMessageId = null)
         next = next.copy(updatedAt = System.currentTimeMillis())
 
-        store.save(next)
-        _state.update { it.copy(active = next, sessions = store.sessions()) }
+        persist(next)
+        _state.update { it.copy(active = next, sessions = withSession(it.sessions, next)) }
     }
 
     fun stop() {
@@ -427,8 +444,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 if (it.status == Msg.STATUS_STREAMING) it.copy(status = Msg.STATUS_STOPPED) else it
             }
             val next = a.copy(messages = msgs, updatedAt = System.currentTimeMillis())
-            store.save(next)
-            st.copy(active = next, streaming = false, sessions = store.sessions())
+            persist(next)
+            st.copy(active = next, streaming = false, sessions = withSession(st.sessions, next))
         }
     }
 
@@ -613,8 +630,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                                     m.copy(thinkSeconds = if (m.thinkingText.isNotBlank()) elapsed else 0)
                                 )
                             } else a
-                            store.save(next)
-                            cur.copy(active = next, streaming = false, sessions = store.sessions())
+                            persist(next)
+                            cur.copy(active = next, streaming = false, sessions = withSession(cur.sessions, next))
                         }
                     }
                     call = null

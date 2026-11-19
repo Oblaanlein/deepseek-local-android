@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.sp
 import com.local.dsapp.R
 import com.local.dsapp.data.Msg
@@ -90,9 +93,17 @@ fun ChatScreen(
     var turnsOpen by remember { mutableStateOf(false) }
     var jumpTarget by remember { mutableStateOf<Int?>(null) }
 
+    val scope = rememberCoroutineScope()
     LaunchedEffect(jumpTarget) {
         jumpTarget?.let { idx ->
-            if (idx in chain.indices) listState.animateScrollToItem(idx)
+            if (idx in chain.indices) {
+                // 跨得远就直接瞬移，别一格一格滚（长对话从底部跳到顶部要滚很久）
+                if (kotlin.math.abs(idx - listState.firstVisibleItemIndex) > 8) {
+                    listState.scrollToItem(idx)
+                } else {
+                    listState.animateScrollToItem(idx)
+                }
+            }
             jumpTarget = null
         }
     }
@@ -108,6 +119,7 @@ fun ChatScreen(
         ) {
             TopBar(
                 title = state.active?.title.orEmpty(),
+                onTitleDoubleTap = { scope.launch { listState.scrollToItem(0) } },
                 onMenu = onMenu,
                 onTurns = { turnsOpen = true },
                 onNewChat = onNewChat
@@ -210,6 +222,7 @@ fun ChatScreen(
 @Composable
 private fun TopBar(
     title: String,
+    onTitleDoubleTap: () -> Unit,
     onMenu: () -> Unit,
     onTurns: () -> Unit,
     onNewChat: () -> Unit
@@ -260,6 +273,10 @@ private fun TopBar(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 8.dp)
+                // 双击标题回到对话最顶端
+                .pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap = { onTitleDoubleTap() })
+                }
         )
 
         Row(
