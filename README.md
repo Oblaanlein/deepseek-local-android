@@ -7,10 +7,15 @@
 > 非官方项目，与深度求索无关。
 
 <p align="center">
-  <img src="docs/screenshots/01-home.png" width="23%" />
-  <img src="docs/screenshots/02-table.png" width="23%" />
-  <img src="docs/screenshots/03-math.png" width="23%" />
-  <img src="docs/screenshots/05-settings.png" width="23%" />
+  <img src="docs/screenshots/00-drawer.png" width="18%" />
+  <img src="docs/screenshots/00-turns.png" width="18%" />
+  <img src="docs/screenshots/01-home.png" width="18%" />
+  <img src="docs/screenshots/02-table.png" width="18%" />
+  <img src="docs/screenshots/03-math.png" width="18%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/06-usage.png" width="18%" />
+  <img src="docs/screenshots/05-settings.png" width="18%" />
 </p>
 
 ## 下载
@@ -52,14 +57,18 @@
 
 单价按官方价目表**分项计价**，并实现**峰谷价**：UTC 01–04、06–10 之外是低谷，单价减半；周末全天低谷。
 
-**2. 右侧「对话轮次」边栏**
+**2. 账户余额查询**
+
+设置 → 账户 → 余额，点一下查当前账户余额（`GET /user/balance`），支持多币种，不可用时会有标注。
+
+**3. 右侧「对话轮次」边栏**
 
 顶栏「目录」图标唤出，也可以**在对话区左滑**打开。列出每一轮提问，带分支标记（`问题 2/2`、`回答 1/2`），
 每条可以：跳到这一轮 / **修改这一轮** / **重新生成回答** / **删除这一轮**（摘掉该轮及其子树，后面的轮次自动接上）。
 
 官方 App 只能滚着找历史，也没有「删单轮」。
 
-**3. 其他**
+**4. 其他**
 
 - 左滑/右滑双向唤出边栏（右滑开历史抽屉，左滑开轮次栏）
 - 长按会话可多选批量置顶/删除
@@ -92,6 +101,7 @@
 
 **其他**
 - 顶栏标题过长省略号，不再压住两侧图标
+- **新增账户余额查询**：设置 → 账户 → 余额，点一下查当前余额（`GET /user/balance`）
 - 设置里的版本号改为读取 BuildConfig
 
 ### v0.1.1

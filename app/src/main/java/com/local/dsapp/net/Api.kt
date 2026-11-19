@@ -216,6 +216,39 @@ object Api {
         }
     }
 
+
+    /**
+     * 查账户余额：GET /user/balance
+     * 返回 { is_available, balance_infos: [{ currency, total_balance, granted_balance, topped_up_balance }] }
+     * 成功返回可读文案，失败返回 null（用 error 传错误信息）
+     */
+    fun balance(apiKey: String): Pair<String?, String?> {
+        val request = Request.Builder()
+            .url("$ORIGIN/user/balance")
+            .header("Authorization", "Bearer $apiKey")
+            .get()
+            .build()
+        return try {
+            client.newCall(request).execute().use { r ->
+                val body = r.body?.string().orEmpty()
+                if (!r.isSuccessful) return null to (parseError(body) ?: "HTTP ${r.code}")
+                val json = JSONObject(body)
+                val infos = json.optJSONArray("balance_infos") ?: return null to "没有余额信息"
+                if (infos.length() == 0) return null to "没有余额信息"
+                val parts = (0 until infos.length()).mapNotNull { i ->
+                    val o = infos.optJSONObject(i) ?: return@mapNotNull null
+                    val cur = o.optString("currency")
+                    val symbol = if (cur == "CNY") "¥" else "$"
+                    val total = o.optString("total_balance")
+                    "$symbol$total"
+                }
+                (parts.joinToString(" / ") + (if (json.optBoolean("is_available")) "" else "（不可用）")) to null
+            }
+        } catch (e: Exception) {
+            null to (e.message ?: "网络错误")
+        }
+    }
+
     private fun parseError(text: String): String? {
         if (text.isBlank()) return null
         return runCatching {

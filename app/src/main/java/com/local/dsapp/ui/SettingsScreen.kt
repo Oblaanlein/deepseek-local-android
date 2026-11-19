@@ -51,6 +51,7 @@ fun SettingsScreen(
     onShowUsage: (Boolean) -> Unit,
     onVoice: (String) -> Unit,
     onAutoCollapseLong: (Boolean) -> Unit,
+    onRefreshBalance: () -> Unit,
     onExport: () -> ByteArray,
     onImport: (android.net.Uri) -> Unit,
     onToast: (String) -> Unit
@@ -131,6 +132,17 @@ fun SettingsScreen(
                     }
                 }
 
+                Divider()
+                SettingRow(IconKind.Sliders, "余额", onClick = onRefreshBalance) {
+                    Text(
+                        when {
+                            state.balanceLoading -> "查询中…"
+                            state.balance != null -> state.balance
+                            else -> "点击查询"
+                        },
+                        style = DsType.label.copy(color = c.textSecondary, fontSize = 14.sp)
+                    )
+                }
                 Divider()
                 SettingRow(IconKind.Sliders, "模型", onClick = { modelDialog = true }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

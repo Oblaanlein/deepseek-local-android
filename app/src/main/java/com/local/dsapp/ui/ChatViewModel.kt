@@ -43,6 +43,9 @@ data class UiState(
     val autoCollapse: Boolean = true,
     /** 长用户消息自动折叠 */
     val autoCollapseLong: Boolean = true,
+    /** 账户余额文案（查过一次后缓存） */
+    val balance: String? = null,
+    val balanceLoading: Boolean = false,
     /** 朗读音色 stella / tide */
     val voice: String = "stella",
     val showUsage: Boolean = true,
@@ -207,6 +210,21 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun setModel(model: String) {
         settings.model = model
         _state.update { it.copy(model = model) }
+    }
+
+    /** 查账户余额（GET /user/balance） */
+    fun refreshBalance() {
+        val st = _state.value
+        if (st.apiKey.isBlank()) {
+            _state.update { it.copy(toast = "先在设置里填 API Key") }
+            return
+        }
+        if (st.balanceLoading) return
+        _state.update { it.copy(balanceLoading = true) }
+        viewModelScope.launch {
+            val (text, err) = withContext(Dispatchers.IO) { Api.balance(st.apiKey) }
+            _state.update { it.copy(balanceLoading = false, balance = text ?: err) }
+        }
     }
 
     fun setAutoCollapseLong(v: Boolean) {

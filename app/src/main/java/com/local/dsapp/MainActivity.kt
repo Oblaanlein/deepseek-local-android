@@ -94,6 +94,7 @@ private fun Root(vm: ChatViewModel) {
                 onShowUsage = vm::setShowUsage,
                 onVoice = vm::setVoice,
                 onAutoCollapseLong = vm::setAutoCollapseLong,
+                onRefreshBalance = vm::refreshBalance,
                 onExport = { vm.exportZip() },
                 onImport = { uri -> vm.importBackup(uri) },
                 onToast = { msg -> vm.toast(msg) }
