@@ -7,7 +7,7 @@
 > 非官方项目，与深度求索无关。
 
 <p align="center">
-  <img src="docs/screenshots/00-drawer.png" width="18%" />
+  <img src="docs/screenshots/00-drawer.jpg" width="18%" />
   <img src="docs/screenshots/00-turns.png" width="18%" />
   <img src="docs/screenshots/01-home.png" width="18%" />
   <img src="docs/screenshots/02-table.png" width="18%" />
