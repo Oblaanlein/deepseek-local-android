@@ -41,6 +41,8 @@ data class UiState(
     val apiKey: String = "",
     val model: String = MODEL_FLASH,
     val autoCollapse: Boolean = true,
+    /** 长用户消息自动折叠 */
+    val autoCollapseLong: Boolean = true,
     /** 朗读音色 stella / tide */
     val voice: String = "stella",
     val showUsage: Boolean = true,
@@ -80,6 +82,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 apiKey = settings.apiKey,
                 model = settings.model,
                 autoCollapse = settings.autoCollapseThinking,
+                autoCollapseLong = settings.autoCollapseLong,
                 voice = settings.voice,
                 showUsage = settings.showUsage
             )
@@ -197,6 +200,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun setModel(model: String) {
         settings.model = model
         _state.update { it.copy(model = model) }
+    }
+
+    fun setAutoCollapseLong(v: Boolean) {
+        settings.autoCollapseLong = v
+        _state.update { it.copy(autoCollapseLong = v) }
     }
 
     fun setVoice(v: String) {

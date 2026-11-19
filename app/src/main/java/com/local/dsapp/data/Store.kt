@@ -69,6 +69,11 @@ class Settings(context: Context) {
         get() = prefs.getString("model", MODEL_FLASH) ?: MODEL_FLASH
         set(v) = prefs.edit().putString("model", v).apply()
 
+    /** 长用户消息自动折叠（超出可视高度时截断 + 淡出 + 下箭头） */
+    var autoCollapseLong: Boolean
+        get() = prefs.getBoolean("autoCollapseLong", true)
+        set(v) = prefs.edit().putBoolean("autoCollapseLong", v).apply()
+
     /** 朗读音色：stella（海星，女声）/ tide（暗潮，男声） */
     var voice: String
         get() = prefs.getString("voice", "stella") ?: "stella"

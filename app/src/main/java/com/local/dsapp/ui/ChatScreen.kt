@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.local.dsapp.R
@@ -73,7 +76,15 @@ fun ChatScreen(
     onAddUri: (android.net.Uri, String?, String?, Boolean) -> Unit
 ) {
     val c = LocalDsColors.current
-    val chain = state.chain
+    // 长对话（几千条）下这两项每帧重算会明显掉帧，按会话缓存
+    val chain = remember(state.active) { state.active?.visibleChain() ?: emptyList() }
+    val siblingMap = remember(state.active) {
+        val map = HashMap<String, List<Msg>>()
+        state.active?.messages?.groupBy { it.parentId }?.forEach { (_, kids) ->
+            kids.forEach { map[it.id] = kids }
+        }
+        map
+    }
     val listState = rememberLazyListState()
 
     var turnsOpen by remember { mutableStateOf(false) }
@@ -124,7 +135,7 @@ fun ChatScreen(
                     HomeBody()
                 } else {
                     MessageList(
-                        state, chain, listState,
+                        state, chain, siblingMap, listState,
                         onRegenerate, onEdit, onSwitchBranch, onToast, onOpenUrl
                     )
                 }
@@ -204,15 +215,14 @@ private fun TopBar(
     onNewChat: () -> Unit
 ) {
     val c = LocalDsColors.current
-    Box(
+    Row(
         Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(52.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 6.dp),
+            Modifier.padding(start = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -240,21 +250,20 @@ private fun TopBar(
             }
         }
 
-        if (title.isNotBlank()) {
-            Text(
-                title,
-                style = DsType.title.copy(color = c.text, fontSize = 16.5.sp),
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 64.dp)
-            )
-        }
+        // 标题占中间的剩余宽度，过长自动省略，永远不会压到两侧图标
+        Text(
+            title,
+            style = DsType.title.copy(color = c.text, fontSize = 16.5.sp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+        )
 
         Row(
-            Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 10.dp),
+            Modifier.padding(end = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -299,7 +308,7 @@ private fun HomeBody() {
                 fontWeight = FontWeight.SemiBold
             )
         )
-        Spacer(Modifier.weight(1.6f))
+        Spacer(Modifier.weight(1.06f))
     }
 }
 
@@ -307,6 +316,7 @@ private fun HomeBody() {
 private fun MessageList(
     state: UiState,
     chain: List<Msg>,
+    siblingMap: Map<String, List<Msg>>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onRegenerate: (String) -> Unit,
     onEdit: (String) -> Unit,
@@ -316,9 +326,34 @@ private fun MessageList(
 ) {
     val lastLen = chain.lastOrNull()?.let { it.plainText.length + it.thinkingText.length } ?: 0
 
+    // 跟随模式：只有用户本来就停在底部时才自动滚；手动往上翻就停止跟随，
+    // 翻回底部再自动恢复。否则流式输出期间会被一直拽回末尾，没法往下看。
+    var follow by remember { mutableStateOf(true) }
+    var programmatic by remember { mutableStateOf(false) }
+
+    var lastSize by remember { mutableStateOf(0) }
     LaunchedEffect(chain.size, lastLen) {
-        if (chain.isNotEmpty()) {
-            listState.scrollToItem(chain.lastIndex)
+        // 只在「流式输出中」或「新增了消息」时自动滚；
+        // 切换分支（条数不变、非流式）不滚，否则会突然跳一下
+        val grew = chain.size != lastSize
+        lastSize = chain.size
+        if (chain.isEmpty() || !follow) return@LaunchedEffect
+        if (!grew && !state.streaming) return@LaunchedEffect
+        programmatic = true
+        listState.scrollToItem(chain.lastIndex)
+        // scrollToItem 会把最后一条对齐到顶部；再滚一大截由框架钳到底，才是真正贴底
+        listState.scrollBy(20_000f)
+        programmatic = false
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (scrolling || programmatic) return@collect
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            follow = last != null &&
+                last.index == info.totalItemsCount - 1 &&
+                last.offset + last.size <= info.viewportEndOffset + 8
         }
     }
 
@@ -326,13 +361,13 @@ private fun MessageList(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 26.dp),
         contentPadding = PaddingValues(bottom = 10.dp)
     ) {
         items(chain, key = { it.id }) { msg ->
             MessageItem(
                 msg = msg,
-                siblings = state.active?.siblings(msg.id) ?: listOf(msg),
+                siblings = siblingMap[msg.id] ?: listOf(msg),
                 autoCollapseThinking = state.autoCollapse,
                 showUsage = state.showUsage,
                 streaming = state.streaming,
@@ -342,7 +377,8 @@ private fun MessageList(
                 onToast = onToast,
                 onOpenUrl = onOpenUrl,
                 apiKey = state.apiKey,
-                voice = state.voice
+                voice = state.voice,
+                autoCollapseLong = state.autoCollapseLong
             )
         }
     }

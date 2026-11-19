@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -157,7 +159,7 @@ fun InputCard(
                 .shadow(8.dp, RoundedCornerShape(22.dp), ambientColor = Color(0x12000000))
                 .background(c.surface, RoundedCornerShape(22.dp))
                 .border(1.dp, c.divider, RoundedCornerShape(22.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 10.dp)
         ) {
             Box(Modifier.fillMaxWidth()) {
                 if (input.isEmpty()) {
@@ -166,14 +168,17 @@ fun InputCard(
                         style = DsType.body.copy(color = c.textTertiary, fontSize = 15.sp)
                     )
                 }
+                val fieldScroll = rememberScrollState()
                 BasicTextField(
                     value = input,
                     onValueChange = onInput,
-                    textStyle = DsType.body.copy(color = c.text),
+                    textStyle = DsType.body.copy(color = c.text, fontSize = 15.sp, lineHeight = 22.sp),
                     cursorBrush = SolidColor(c.accent),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        // 单行 30dp 起，随内容增高，最多 6 行（168dp）后内部滚动
+                        .heightIn(min = 30.dp, max = 168.dp)
+                        .verticalScroll(fieldScroll)
                 )
             }
 

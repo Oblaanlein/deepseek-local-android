@@ -1,8 +1,10 @@
 package com.local.dsapp.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -31,16 +33,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.local.dsapp.data.Block
@@ -60,10 +65,11 @@ fun MessageItem(
     onToast: (String) -> Unit,
     onOpenUrl: (String) -> Unit,
     apiKey: String,
-    voice: String
+    voice: String,
+    autoCollapseLong: Boolean
 ) {
     if (msg.isUser) {
-        UserMessage(msg, siblings, onSwitchBranch, onEdit, onToast)
+        UserMessage(msg, siblings, autoCollapseLong, onSwitchBranch, onEdit, onToast)
     } else {
         AssistantMessage(
             msg, siblings, autoCollapseThinking, showUsage, streaming,
@@ -127,10 +133,15 @@ private fun CopyAction(text: String, onToast: (String) -> Unit) {
 
 /* ------------------------------------------------------------------ 用户消息 */
 
+/** 超过这个长度才折叠；折叠后显示 8 行（约 28sp*8） */
+private const val COLLAPSE_CHARS = 200
+private const val COLLAPSE_LINES = 8
+
 @Composable
 private fun UserMessage(
     msg: Msg,
     siblings: List<Msg>,
+    autoCollapseLong: Boolean,
     onSwitchBranch: (Int) -> Unit,
     onEdit: () -> Unit,
     onToast: (String) -> Unit
@@ -138,12 +149,14 @@ private fun UserMessage(
     val c = LocalDsColors.current
     var menu by remember { mutableStateOf(false) }
     var selecting by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable(msg.id) { mutableStateOf(false) }
+    val collapsed = autoCollapseLong && !expanded && !selecting && msg.text.length > COLLAPSE_CHARS
     val clipboard = LocalClipboardManager.current
 
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 14.dp, bottom = 6.dp),
+            .padding(top = 14.dp, bottom = 10.dp),
         horizontalAlignment = Alignment.End
     ) {
         Box {
@@ -155,11 +168,13 @@ private fun UserMessage(
                     .then(
                         if (selecting) Modifier
                         else Modifier.combinedClickable(
-                            onClick = {},
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onEdit() },
                             onLongClick = { menu = true }
                         )
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
             ) {
                 Column {
                     // 附件缩略图（图片直接显示，其它文件显示文件名）
@@ -215,14 +230,58 @@ private fun UserMessage(
                     }
 
                     if (msg.text.isNotBlank()) {
-                        if (selecting) {
-                            SelectionContainer {
-                                Text(msg.text, style = DsType.body.copy(color = c.text))
+                        Box {
+                            val maxLines = if (collapsed) COLLAPSE_LINES else Int.MAX_VALUE
+                            if (selecting) {
+                                SelectionContainer {
+                                    Text(
+                                        msg.text,
+                                        style = DsType.body.copy(color = c.text),
+                                        maxLines = maxLines,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    msg.text,
+                                    style = DsType.body.copy(color = c.text),
+                                    maxLines = maxLines,
+                                    overflow = TextOverflow.Clip
+                                )
                             }
-                        } else {
-                            Text(msg.text, style = DsType.body.copy(color = c.text))
+                            // 截断处淡出，暗示下面还有内容
+                            if (collapsed) {
+                                Box(
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(Color.Transparent, c.userBubble)
+                                            )
+                                        )
+                                )
+                            }
                         }
                     }
+                }
+            }
+
+            // 展开按钮：压在气泡右下角，点它不算「点消息编辑」
+            if (collapsed) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 4.dp, bottom = 4.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(c.surface)
+                        .border(1.dp, c.divider, CircleShape)
+                        .clickable { expanded = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    DsIcon(IconKind.ChevronDown, size = 15.dp, tint = c.textSecondary, stroke = 1.8f)
                 }
             }
 
@@ -270,7 +329,7 @@ private fun UserMessage(
                 PagerArrow(left = true, enabled = idx > 0) { onSwitchBranch(-1) }
                 Text(
                     "${idx + 1}/${siblings.size}",
-                    style = DsType.label.copy(color = c.textSecondary, fontSize = 13.sp),
+                    style = DsType.label.copy(color = c.textSecondary, fontSize = 15.sp),
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 PagerArrow(left = false, enabled = idx < siblings.size - 1) { onSwitchBranch(1) }
@@ -311,11 +370,16 @@ private fun AssistantMessage(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 4.dp)
+            .padding(top = 12.dp, bottom = 4.dp)
             // 长按挂在整条消息上：内层内容 Column 的命中区随文本宽度浮动，容易漏
             .then(
                 if (selecting || isThisStreaming) Modifier
-                else Modifier.combinedClickable(onClick = {}, onLongClick = { menu = true })
+                else Modifier.combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                    onLongClick = { menu = true }
+                )
             )
     ) {
         if (thinking.isNotBlank()) {

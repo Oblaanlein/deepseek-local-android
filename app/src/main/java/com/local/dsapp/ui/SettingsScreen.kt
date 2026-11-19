@@ -50,6 +50,7 @@ fun SettingsScreen(
     onAutoCollapse: (Boolean) -> Unit,
     onShowUsage: (Boolean) -> Unit,
     onVoice: (String) -> Unit,
+    onAutoCollapseLong: (Boolean) -> Unit,
     onExport: () -> ByteArray,
     onImport: (android.net.Uri) -> Unit,
     onToast: (String) -> Unit
@@ -158,6 +159,15 @@ fun SettingsScreen(
                         modifier = Modifier.scale(0.82f),
                         checked = state.showUsage,
                         onCheckedChange = onShowUsage,
+                        colors = SwitchDefaults.colors(checkedTrackColor = c.accent)
+                    )
+                }
+                Divider()
+                SettingRow(IconKind.ChevronDown, "长消息自动折叠", onClick = {}) {
+                    Switch(
+                        modifier = Modifier.scale(0.82f),
+                        checked = state.autoCollapseLong,
+                        onCheckedChange = onAutoCollapseLong,
                         colors = SwitchDefaults.colors(checkedTrackColor = c.accent)
                     )
                 }

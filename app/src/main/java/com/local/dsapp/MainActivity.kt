@@ -93,6 +93,7 @@ private fun Root(vm: ChatViewModel) {
                 onAutoCollapse = vm::setAutoCollapse,
                 onShowUsage = vm::setShowUsage,
                 onVoice = vm::setVoice,
+                onAutoCollapseLong = vm::setAutoCollapseLong,
                 onExport = { vm.exportZip() },
                 onImport = { uri -> vm.importBackup(uri) },
                 onToast = { msg -> vm.toast(msg) }
