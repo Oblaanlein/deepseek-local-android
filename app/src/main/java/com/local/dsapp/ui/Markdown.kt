@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +67,12 @@ private val RE_TABLE_SEP = Regex("^\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)+\
 
 private fun splitRow(line: String): List<String> =
     line.trim().trim('|').split('|').map { it.trim() }
+
+private val parseCache = android.util.LruCache<String, List<Md>>(24)
+
+/** 解析结果缓存：切换分支来回看同一段文字时不用重新解析 */
+private fun parseCached(text: String): List<Md> =
+    parseCache.get(text) ?: parse(text).also { parseCache.put(text, it) }
 
 private fun parse(src: String): List<Md> {
     val out = mutableListOf<Md>()
@@ -313,7 +321,7 @@ private fun topMargin(b: Md): Int = when (b) {
 
 @Composable
 fun Markdown(text: String, colors: DsColors = LocalDsColors.current, modifier: Modifier = Modifier) {
-    val blocks = remember(text) { parse(text) }
+    val blocks = remember(text) { parseCached(text) }
     val bodyStyle = TextStyle(fontSize = 16.sp, lineHeight = 26.sp)
 
     Column(modifier) {
@@ -377,15 +385,26 @@ fun Markdown(text: String, colors: DsColors = LocalDsColors.current, modifier: M
                     )
                 }
 
-                is Md.Bullet -> Column(Modifier.padding(start = 18.dp)) {
+                is Md.Bullet -> Column(Modifier.padding(start = 14.dp)) {
                     b.items.forEachIndexed { idx, item ->
                         if (idx > 0) Spacer(Modifier.height(6.dp))
                         Row {
-                            Text(
-                                if (b.ordered) "${idx + 1}." else "•",
-                                style = bodyStyle.copy(color = colors.textSecondary)
-                            )
-                            Spacer(Modifier.width(6.dp))
+                            // 用 4dp 的小圆点，而不是「•」字符：字符自带宽度，会把点和文字撑开
+                            if (b.ordered) {
+                                Text(
+                                    "${idx + 1}.",
+                                    style = bodyStyle.copy(color = colors.textSecondary),
+                                    modifier = Modifier.width(18.dp)
+                                )
+                            } else {
+                                Box(
+                                    Modifier
+                                        .padding(top = 11.dp)
+                                        .size(4.dp)
+                                        .background(colors.textSecondary, CircleShape)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            }
                             RichTextView(
                                 inline(item, colors),
                                 bodyStyle.copy(color = colors.text),

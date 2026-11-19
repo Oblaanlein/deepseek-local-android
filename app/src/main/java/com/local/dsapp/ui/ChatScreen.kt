@@ -361,7 +361,7 @@ private fun MessageList(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 26.dp),
+            .padding(horizontal = 22.dp),
         contentPadding = PaddingValues(bottom = 10.dp)
     ) {
         items(chain, key = { it.id }) { msg ->

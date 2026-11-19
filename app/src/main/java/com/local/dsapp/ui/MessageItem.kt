@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -91,7 +92,7 @@ private fun PagerArrow(left: Boolean, enabled: Boolean, onClick: () -> Unit) {
     ) {
         DsIcon(
             if (left) IconKind.ChevronLeft else IconKind.ChevronRight,
-            size = 15.dp,
+            size = 18.dp,
             tint = if (enabled) c.textSecondary else c.divider,
             stroke = 1.8f
         )
@@ -329,7 +330,7 @@ private fun UserMessage(
                 PagerArrow(left = true, enabled = idx > 0) { onSwitchBranch(-1) }
                 Text(
                     "${idx + 1}/${siblings.size}",
-                    style = DsType.label.copy(color = c.textSecondary, fontSize = 15.sp),
+                    style = DsType.label.copy(color = c.textSecondary, fontSize = 16.sp),
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 PagerArrow(left = false, enabled = idx < siblings.size - 1) { onSwitchBranch(1) }
@@ -531,6 +532,8 @@ private fun ActionRow(
     Row(
         Modifier
             .fillMaxWidth()
+            // 官方这里的分页箭头比正文左边缘还要凸出一点
+            .offset(x = (-8).dp)
             .padding(top = 10.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
