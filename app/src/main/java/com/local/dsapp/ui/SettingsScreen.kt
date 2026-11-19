@@ -207,7 +207,7 @@ fun SettingsScreen(
             Card {
                 SettingRow(IconKind.Globe, "版本", onClick = {}) {
                     Text(
-                        "0.1.0",
+                        com.local.dsapp.BuildConfig.VERSION_NAME,
                         style = DsType.label.copy(color = c.textSecondary, fontSize = 14.sp)
                     )
                 }

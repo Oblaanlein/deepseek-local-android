@@ -6,17 +6,16 @@
 
 > 非官方项目，与深度求索无关。
 
+<p align="center">
+  <img src="docs/screenshots/01-home.png" width="23%" />
+  <img src="docs/screenshots/02-table.png" width="23%" />
+  <img src="docs/screenshots/03-math.png" width="23%" />
+  <img src="docs/screenshots/05-settings.png" width="23%" />
+</p>
+
 ## 下载
 
 **[⬇ 最新 APK](https://github.com/Oblaanlein/deepseek-local-android/releases/latest)** —— 要求 Android 8.0（API 26）及以上，安装后到「抽屉 → 设置」填自己的 API Key。
-
-
-<p align="center">
-  <img src="docs/screenshots/01-home.png" width="24%" />
-  <img src="docs/screenshots/02-turns.png" width="24%" />
-  <img src="docs/screenshots/03-usage.png" width="24%" />
-  <img src="docs/screenshots/04-settings.png" width="24%" />
-</p>
 
 ---
 
@@ -56,12 +55,7 @@
 **2. 右侧「对话轮次」边栏**
 
 顶栏「目录」图标唤出，也可以**在对话区左滑**打开。列出每一轮提问，带分支标记（`问题 2/2`、`回答 1/2`），
-每条可以：
-
-- 跳到这一轮
-- **修改这一轮**（填回输入框，发送后另开分支）
-- **重新生成回答**
-- **删除这一轮**（摘掉该轮及其子树，后面的轮次自动接上）
+每条可以：跳到这一轮 / **修改这一轮** / **重新生成回答** / **删除这一轮**（摘掉该轮及其子树，后面的轮次自动接上）。
 
 官方 App 只能滚着找历史，也没有「删单轮」。
 
@@ -70,13 +64,47 @@
 - 左滑/右滑双向唤出边栏（右滑开历史抽屉，左滑开轮次栏）
 - 长按会话可多选批量置顶/删除
 - 搜索是**全文搜索**（搜标题也搜消息正文，结果带摘要片段和分支标记），不是只匹配标题
+- 双击顶栏标题回到对话最顶端
+
+---
+
+## 更新日志
+
+### v0.1.2
+
+**排版对齐官方（逐像素量过）**
+- 正文 16/26，左右留白 22dp（实测官方 24.5dp），段间距按 CSS margin 折叠
+- 列表圆点改为 4dp 实心圆，**左切线与正文左边缘对齐**，项间距放宽
+- 标题按 h1~h4 分级字号；表格 15/25、只有横向分隔线、列宽按内容自适应、超屏横向滚动
+- 公式改用 **JLaTeXMath 真排版**（分式上下叠、求和号带上下限），支持 `$$…$$`、`\[…\]`、`\(…\)`、`$…$` 四种写法
+- 代码块 12dp 圆角、13/22 等宽
+
+**交互**
+- 点击用户消息直接进入编辑；输入框随文本增高，到 6 行后内部滚动
+- 长消息自动折叠（截断处淡出 + 圆形下箭头），设置里可关，默认开
+- 流式输出时可以自由上下翻，不再被拽回底部；滚动时不再闪长按灰底
+- 双击标题回到对话顶部；轮次栏远距离跳转改为瞬移
+
+**性能**
+- 分支切换：去掉每次点击的「全库重读 + 解析」（这是之前切换卡顿的根因），改为异步落盘 + 内存替换
+- 切换后按消息溢出量补滚，分页按钮停在原位，可以连续点击
+- Markdown 解析结果做缓存，来回切分支不重复解析
+
+**其他**
+- 顶栏标题过长省略号，不再压住两侧图标
+- 设置里的版本号改为读取 BuildConfig
+
+### v0.1.1
+
+- 修复导入官方 ZIP 报「压缩包里没有找到会话」（官方是流式 zip，`ZipInputStream` 读不了，改用 `ZipFile`）
+- 导入改成进度弹窗，失败时给出具体文件名和异常
 
 ---
 
 ## 跑起来
 
 ```bash
-# 环境：JDK 17+、Android SDK（compileSdk 37 / minSdk 26）
+# 环境：JDK 17+、Android SDK（compileSdk 36 / minSdk 26）
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -115,14 +143,16 @@ app/src/main/java/com/local/dsapp/
 │  ├─ Api.kt        请求体组装 + SSE 逐行解析（照搬官方 client.ts）
 │  └─ SpeechApi.kt  服务端 TTS（裸 PCM 流）
 └─ ui/
-   ├─ ChatScreen.kt     对话页、手势
+   ├─ ChatScreen.kt     对话页、手势、滚动跟随
    ├─ MessageItem.kt    消息渲染、长按菜单、操作行
    ├─ InputCard.kt      输入卡片、附件面板、语音输入
    ├─ Drawer.kt         左侧历史抽屉（搜索/置顶/多选）
    ├─ TurnsPanel.kt     右侧轮次栏
    ├─ ReadAloud.kt      朗读：AudioTrack 流式播放
    ├─ ReadingBars.kt    朗读中的四根跳动竖条
-   ├─ Markdown.kt       轻量 Markdown 渲染
+   ├─ Markdown.kt       Markdown 渲染（表格/代码块/列表）
+   ├─ Latex.kt          LaTeX 兜底转换（解析失败时用）
+   ├─ MathRender.kt     公式：JLaTeXMath 渲染成位图 + 缓存
    └─ SettingsScreen.kt 设置页
 ```
 
@@ -133,11 +163,23 @@ app/src/main/java/com/local/dsapp/
 都踩过了，记下来省得再踩：
 
 - **AGP 9 内置 Kotlin**：不要再套 `org.jetbrains.kotlin.android` 插件，否则版本打架
-- **`compileSdk 37`**：低于这个版本部分 Compose API 不可用
 - **Gradle 镜像**：`distributionUrl` 走腾讯镜像，`networkTimeout` 要调大，否则首次下载容易断
 - **自适应图标**：前景必须自己按 66dp 安全区缩放，否则边缘元素会被圆形遮罩切掉
 - **Compose 长按**：`combinedClickable` 要挂在外层有 `fillMaxWidth` 的容器上，挂在随内容宽度浮动的内层容器上会命中不到
 - **PCM 播放**：16-bit 采样跨网络分片时要保留奇数字节，否则后续全部错位成噪音
+- **`LazyListState.scrollToItem`** 是把该条**对齐到顶部**，不是滚到底；贴底要再 `scrollBy` 一大截由框架钳住
+- **`horizontalScroll` 里宽度无界**：`fillMaxWidth` 会算成 0（表格分隔线因此消失），必须给显式宽度
+
+---
+
+## 第三方依赖
+
+| 依赖 | 用途 | 许可 |
+|---|---|---|
+| [jlatexmath-android](https://github.com/noties/jlatexmath-android) | 数学公式解析与排版 | **GPL-2.0** |
+
+> 公式渲染依赖 JLaTeXMath（GPL-2.0）。按 GPL 的传染性，**包含该依赖的构建产物需按 GPL-2.0 分发**。
+> 本仓库源码公开，符合 GPL 的源码提供要求；二次分发请保留同样的许可。
 
 ---
 
