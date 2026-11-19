@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -347,6 +348,7 @@ private fun MessageList(
     onToast: (String) -> Unit,
     onOpenUrl: (String) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val lastLen = chain.lastOrNull()?.let { it.plainText.length + it.thinkingText.length } ?: 0
 
     // 跟随模式：只有用户本来就停在底部时才自动滚；手动往上翻就停止跟随，
@@ -396,7 +398,24 @@ private fun MessageList(
                 streaming = state.streaming,
                 onRegenerate = { onRegenerate(msg.id) },
                 onEdit = { onEdit(msg.id) },
-                onSwitchBranch = { delta -> onSwitchBranch(msg.id, delta) },
+                onSwitchBranch = { delta ->
+                    val idx = chain.indexOfFirst { it.id == msg.id }
+                    val before = listState.layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.index == idx }?.size
+                    onSwitchBranch(msg.id, delta)
+                    if (idx >= 0 && before != null) {
+                        scope.launch {
+                            // 等新内容测量完成再补滚，否则拿到的是旧高度
+                            withFrameNanos { }
+                            withFrameNanos { }
+                            val after = listState.layoutInfo.visibleItemsInfo
+                                .firstOrNull { it.index == idx }?.size
+                            if (after != null && after != before) {
+                                listState.scrollBy((after - before).toFloat())
+                            }
+                        }
+                    }
+                },
                 onToast = onToast,
                 onOpenUrl = onOpenUrl,
                 apiKey = state.apiKey,
