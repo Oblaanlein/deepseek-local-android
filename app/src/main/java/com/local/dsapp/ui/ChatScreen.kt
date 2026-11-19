@@ -400,19 +400,17 @@ private fun MessageList(
                 onEdit = { onEdit(msg.id) },
                 onSwitchBranch = { delta ->
                     val idx = chain.indexOfFirst { it.id == msg.id }
-                    val before = listState.layoutInfo.visibleItemsInfo
-                        .firstOrNull { it.index == idx }?.size
                     onSwitchBranch(msg.id, delta)
-                    if (idx >= 0 && before != null) {
+                    if (idx >= 0) {
                         scope.launch {
-                            // 等新内容测量完成再补滚，否则拿到的是旧高度
+                            // 只等一帧，减少可见的中间态；然后按「超出视口多少」一次性补滚，
+                            // 保证分页按钮被拉回屏幕内，且长→短时不做无谓的负向滚动（那会闪一下）
                             withFrameNanos { }
-                            withFrameNanos { }
-                            val after = listState.layoutInfo.visibleItemsInfo
-                                .firstOrNull { it.index == idx }?.size
-                            if (after != null && after != before) {
-                                listState.scrollBy((after - before).toFloat())
-                            }
+                            val info = listState.layoutInfo
+                            val item = info.visibleItemsInfo.firstOrNull { it.index == idx }
+                                ?: return@launch
+                            val overflow = item.offset + item.size - info.viewportEndOffset
+                            if (overflow > 0) listState.scrollBy(overflow.toFloat())
                         }
                     }
                 },
