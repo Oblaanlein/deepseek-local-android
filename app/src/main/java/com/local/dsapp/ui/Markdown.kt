@@ -385,7 +385,7 @@ fun Markdown(text: String, colors: DsColors = LocalDsColors.current, modifier: M
                     )
                 }
 
-                is Md.Bullet -> Column(Modifier.padding(start = 13.dp)) {
+                is Md.Bullet -> Column {
                     b.items.forEachIndexed { idx, item ->
                         if (idx > 0) Spacer(Modifier.height(6.dp))
                         Row {
@@ -399,11 +399,11 @@ fun Markdown(text: String, colors: DsColors = LocalDsColors.current, modifier: M
                             } else {
                                 Box(
                                     Modifier
-                                        .padding(top = 10.dp)
-                                        .size(3.dp)
+                                        .padding(top = 9.dp)
+                                        .size(5.dp)
                                         .background(colors.textSecondary, CircleShape)
                                 )
-                                Spacer(Modifier.width(4.dp))
+                                Spacer(Modifier.width(6.dp))
                             }
                             RichTextView(
                                 inline(item, colors),

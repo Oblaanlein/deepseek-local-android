@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -263,21 +264,26 @@ private fun TopBar(
             }
         }
 
-        // 标题占中间的剩余宽度，过长自动省略，永远不会压到两侧图标
-        Text(
-            title,
-            style = DsType.title.copy(color = c.text, fontSize = 16.5.sp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
+        // 标题占中间的剩余宽度，过长自动省略，永远不会压到两侧图标。
+        // 双击这块区域回到对话最顶端（手势挂在外层 Box 上，命中区比文字本身大）
+        Box(
+            Modifier
                 .weight(1f)
-                .padding(horizontal = 8.dp)
-                // 双击标题回到对话最顶端
+                .fillMaxHeight()
                 .pointerInput(Unit) {
                     detectTapGestures(onDoubleTap = { onTitleDoubleTap() })
-                }
-        )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                title,
+                style = DsType.title.copy(color = c.text, fontSize = 16.5.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
 
         Row(
             Modifier.padding(end = 10.dp),
