@@ -387,7 +387,7 @@ fun Markdown(text: String, colors: DsColors = LocalDsColors.current, modifier: M
 
                 is Md.Bullet -> Column {
                     b.items.forEachIndexed { idx, item ->
-                        if (idx > 0) Spacer(Modifier.height(6.dp))
+                        if (idx > 0) Spacer(Modifier.height(14.dp))
                         Row {
                             // 用 4dp 的小圆点，而不是「•」字符：字符自带宽度，会把点和文字撑开
                             if (b.ordered) {
